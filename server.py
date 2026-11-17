@@ -21,7 +21,6 @@ csrf = CSRFProtect(app)
 
 mysql = MySQL(app)
 
-# Página principal
 @app.route('/')
 def inicio():
     return render_template('index.html')
@@ -35,9 +34,7 @@ def login():
 
         try:
             cursor = mysql.connection.cursor()
-            cursor.execute(
-                """SELECT id_usuario, nombre, apellidos, email, pass_hash, id_rol FROM usuarios WHERE email = %s"""
-                ,(correo,)) 
+            cursor.execute("""SELECT id_usuario, nombre, apellidos, email, pass_hash, id_rol FROM usuarios WHERE email = %s""",(correo,)) 
             usuario = cursor.fetchone()
             cursor.close()
 
@@ -82,7 +79,6 @@ def registro():
         try:
             cursor = mysql.connection.cursor()
 
-            # Comprobar si el correo ya existe
             cursor.execute(
                 'SELECT id_usuario FROM usuarios WHERE email = %s',
                 (correo,)
@@ -93,7 +89,6 @@ def registro():
                 flash('Este correo ya está registrado', 'warning')
                 return redirect(url_for('registro'))
 
-            # Obtener el ID del rol Cliente
             cursor.execute("SELECT id_rol FROM roles WHERE nombre_rol = %s", ('Cliente',))
             rol = cursor.fetchone()
 
@@ -130,7 +125,7 @@ def perfil():
 
     try:
         cursor = mysql.connection.cursor()
-        cursor.execute("""SELECT u.id_usuario, u.nombre, u.apellidos, u.email AS correo, r.nombre_rol AS rol FROM usuarios u
+        cursor.execute("""SELECT u.id_usuario, u.nombre, u.apellidos, u.email AS correo, r.nombre_rol AS rol FROM usuarios u 
             INNER JOIN roles r ON u.id_rol = r.id_rol WHERE u.id_usuario = %s""", (session['id_usuario'],))
         usuario = cursor.fetchone()
         cursor.close()
@@ -173,6 +168,64 @@ def catalogo():
         flash('No fue posible cargar el catálogo', 'danger')
         return redirect(url_for('inicio'))
 
+# Inventario: registrar productos
+@app.route('/inventario', methods=['GET', 'POST'])
+def inventario():
+    if 'id_usuario' not in session:
+        flash('Inicia sesión para acceder al inventario', 'warning')
+        return redirect(url_for('login'))
+
+    try:
+        cursor = mysql.connection.cursor()
+
+        if request.method == 'POST':
+            nombre = request.form.get('nombre', '').strip()
+            precio = request.form.get('precio', '').strip()
+            stock = request.form.get('stock', '').strip()
+            id_categoria = request.form.get('id_categoria', '').strip()
+
+            if not nombre or not precio or not stock or not id_categoria:
+                flash('Completa todos los campos', 'warning')
+            else:
+                try:
+                    precio = float(precio)
+                    stock = int(stock)
+                    id_categoria = int(id_categoria)
+
+                    if precio <= 0 or stock < 0:
+                        raise ValueError('Valores inválidos')
+
+                    if len(nombre) > 100:
+                        raise ValueError('Nombre demasiado largo')
+
+                    cursor.execute("SELECT id_categoria FROM categorias WHERE id_categoria = %s", 
+                                   (id_categoria,))
+
+                    if not cursor.fetchone():
+                        flash('La categoría seleccionada no existe', 'danger')
+                    else:
+                        cursor.execute("""INSERT INTO productos (nombre, precio, stock, id_categoria)
+                            VALUES (%s, %s, %s, %s)""", (nombre, precio, stock, id_categoria))
+
+                        mysql.connection.commit()
+                        flash('Producto registrado correctamente', 'success')
+
+                except (ValueError, TypeError):
+                    flash('Verifica que el precio, stock y categoría sean válidos', 'danger')
+
+        cursor.execute("SELECT id_categoria, nombre FROM categorias ORDER BY nombre")
+        categorias = cursor.fetchall()
+        cursor.close()
+
+        return render_template('inventario.html', categorias=categorias)
+
+    except Exception as error:
+        mysql.connection.rollback()
+        print('Error en inventario:', error)
+        flash('No fue posible procesar el inventario', 'danger')
+        return redirect(url_for('inicio'))
+
+                    
 
 # Ejecutar el servidor
 if __name__ == '__main__':

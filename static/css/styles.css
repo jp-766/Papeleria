@@ -25,21 +25,21 @@ body {
 
 /* Barra de Navegación */
 
-.navbar.papelia {
+.navbar.navbar-papelia {
     background-color: var(--color-principal);
 }
 
-.navbar.papelia .navbar-brand {
+.navbar.navbar-papelia .navbar-brand {
     font-size: 1.5rem;
 }
 
-.navbar.papelia .nav-link {
+.navbar.navbar-papelia .nav-link {
     color: var(--color-blanco);
     margin-left: 10px;
     transition: color 0.3s;
 }
 
-.navbar.papelia .nav-link:hover {
+.navbar.navbar-papelia .nav-link:hover {
     color: var(--color-acento);
 }
 

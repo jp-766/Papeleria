@@ -11,9 +11,7 @@
     <div class="text-center mb-4">
 
         <i class="fas fa-user-circle fa-4x" style="color: var(--color-principal);"></i>
-
         <h2 class="mt-3">Información de mi cuenta</h2>
-
         <p>Consulta los datos de tu usuario</p>
 
     </div>
@@ -23,7 +21,6 @@
         <div class="col-md-6">
 
             <label class="form-label fw-bold">Nombre completo</label>
-
             <div class="form-control bg-light">{{ usuario.nombre }}</div>
 
         </div>
@@ -31,7 +28,6 @@
         <div class="col-md-6">
 
             <label class="form-label fw-bold">Correo electrónico</label>
-
             <div class="form-control bg-light">{{ usuario.correo }}</div>
 
         </div>
@@ -39,7 +35,6 @@
         <div class="col-md-6">
 
             <label class="form-label fw-bold">Rol del usuario</label>
-
             <div class="form-control bg-light">{{ usuario.rol }}</div>
 
         </div>
@@ -48,10 +43,9 @@
 
     <div class="text-center mt-4">
 
-        <a href="{{ url_for('logout') }}"
-           class="btn btn-outline-danger">
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger"> 
             <i class="fas fa-sign-out-alt"></i>
-            Cerrar sesión
+            Cerrar session
         </a>
 
     </div>
