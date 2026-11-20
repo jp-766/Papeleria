@@ -42,13 +42,60 @@
 
             <select id="id_categoria" name="id_categoria" required>
                 <option value="Selecciona una categoria"></option>
+            
+                {% for categoria in categorias %}
+                    <option value="{{ categoria.id_categoria }}"> {{ categoria.nombre }}</option>
+                {% endfor %}
             </select>
-
-            {% for categoria in categorias %}
-                <option value="{{ categoria.id_categoria }}"> {{ categoria.nombre }}</option>
-            {% endfor %}
 
             <button type="submit">Registrar producto</button>
     </form>
 </section>
+
+<hr class="my-5">
+
+<section class="mt-4">
+    <h2>Productos registrados</h2>
+    <p>Consulta los productos disponibles en el inventario</p>
+
+    <div class="table-responsive">
+        <table class="table table-stripped table-hover table-bordored align middle">
+
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Producto</th>
+                    <th>Categoria</th>
+                    <th>Precio</th>
+                    <th>Existencias</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for producto in productos%}
+                <tr>
+
+                    <td>{{ producto.nombre }}</td>
+                    <td>{{ producto.categoria }}</td>
+                    <td>${{ "%.2f" | format(producto.precio )}}</td>
+                    <td>{{ producto.stock }}</td>
+                    <td>
+                        <a href="{{ url_for('editar_producto', id_producto=producto.id_producto) }}"
+                            class="btn btn-sm btn-primary">Editar</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center">No hay productos registrados</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+
+        </table>
+    </div>
+</section>
 {% endblock %}
+
+
+
+               

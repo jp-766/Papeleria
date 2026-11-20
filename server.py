@@ -213,11 +213,16 @@ def inventario():
                 except (ValueError, TypeError):
                     flash('Verifica que el precio, stock y categoría sean válidos', 'danger')
 
-        cursor.execute("SELECT id_categoria, nombre FROM categorias ORDER BY nombre")
+        cursor.execute("""SELECT id_categoria, nombre FROM categorias ORDER BY nombre""")
         categorias = cursor.fetchall()
+
+        cursor.execute("""SELECT p.id_producto, p.nombre, p.precio, p.stock, c.nombre AS categoria 
+            FROM productos p INNER JOIN categorias c ON p.id_categoria = c.id_categoria ORDER BY p.nombre""")
+        productos = cursor.fetchall()
+
         cursor.close()
 
-        return render_template('inventario.html', categorias=categorias)
+        return render_template('inventario.html', categorias=categorias, productos=productos)
 
     except Exception as error:
         mysql.connection.rollback()
@@ -225,7 +230,83 @@ def inventario():
         flash('No fue posible procesar el inventario', 'danger')
         return redirect(url_for('inicio'))
 
-                    
+# Editar productos
+@app.route('/editar_producto/<int:id_producto>', methods=['GET', 'POST'])
+def editar_producto(id_producto):
+
+    if 'id_usuario' not in session: 
+        flash('Inicia sesión para acceder al inventario', 'warning')
+        return redirect(url_for('login'))
+
+    cursor = None
+
+    try:
+        cursor = mysql.connection.cursor()
+
+        if request.method == 'POST': 
+            nombre = request.form.get('nombre', '').strip()
+            precio = request.form.get('precio', '').strip()
+            stock = request.form.get('stock', '').strip()
+            id_categoria = request.form.get('id_categoria', '').strip()
+
+            if not nombre or not precio or not stock or not id_categoria:
+                flash('Completa todos los campos', 'warning')
+            else:
+                try:
+                    precio = float(precio)
+                    stock = int(stock)
+                    id_categoria = int(id_categoria)
+
+                    if precio <= 0 or stock < 0 or len(nombre) > 100:
+                        raise ValueError
+
+                    cursor.execute("SELECT id_categoria FROM categorias WHERE id_categoria = %s", 
+                    (id_categoria,))
+
+                    if not cursor.fetchone():
+                        flash('La categoria seleccionada no existe', 'danger')
+                    else:
+                        cursor.execute("""UPDATE productos SET nombre =%s, precio = %s, stock = %s, 
+                    id_categoria = %s WHERE id_producto = %s""", (nombre, precio, stock, id_categoria,
+                    id_producto))
+
+                    if cursor.rowcount == 0:
+                        flash('No se encontró el producto o no hubo cambios', 'warning')
+                    else:
+                        flash('Producto actualizado correctamente', 'sucess')
+
+                    mysql.connection.commit()
+                    cursor.close()
+                    return redirect(url_for('inventario'))
+
+                except (ValueError, TypeError):
+                    flash('Verifica que los datos sean válidos', 'danger')
+
+                    cursor.execute("""SELECT id_producto, nombre, precio, stock, id_categoria FROM productos
+                     WHERE id_producto = %s""", (id_producto,))
+
+                    producto = cursor.fetchone()
+
+                    if not producto:
+                        flash('El producto no existe', 'danger')
+                        cursor.close()
+                        return redirect(url_for('inventario'))
+
+                    cursor.execute("""SELECT id_categoria, nombre FROM categorias ORDER BY nombre""")
+
+                    categorias = cursor.fetchall()
+                    cursor.close()
+
+                    return render_template('editar_producto.html', producto=producto, categorias=categorias)
+
+    except Exception as error:
+        if cursor:
+            cursor.close()
+            mysql.connection.rollback()
+            print('Error al editar producto:', error)
+            flash('No fue posible editar el producto', 'danger')
+            return redirect(url_for('inventario'))
+
 
 # Ejecutar el servidor
 if __name__ == '__main__':
