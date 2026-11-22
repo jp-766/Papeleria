@@ -230,11 +230,11 @@ def inventario():
         flash('No fue posible procesar el inventario', 'danger')
         return redirect(url_for('inicio'))
 
-# Editar productos
+# Editar los productos del inventario
 @app.route('/editar_producto/<int:id_producto>', methods=['GET', 'POST'])
 def editar_producto(id_producto):
 
-    if 'id_usuario' not in session: 
+    if 'id_usuario' not in session:
         flash('Inicia sesión para acceder al inventario', 'warning')
         return redirect(url_for('login'))
 
@@ -243,7 +243,17 @@ def editar_producto(id_producto):
     try:
         cursor = mysql.connection.cursor()
 
-        if request.method == 'POST': 
+        cursor.execute("""SELECT id_producto, nombre, precio, stock, id_categoria
+            FROM productos WHERE id_producto = %s""", (id_producto,))
+
+        producto = cursor.fetchone()
+
+        if not producto:
+            flash('El producto no existe', 'danger')
+            return redirect(url_for('inventario'))
+        
+        if request.method == 'POST':
+
             nombre = request.form.get('nombre', '').strip()
             precio = request.form.get('precio', '').strip()
             stock = request.form.get('stock', '').strip()
@@ -251,6 +261,7 @@ def editar_producto(id_producto):
 
             if not nombre or not precio or not stock or not id_categoria:
                 flash('Completa todos los campos', 'warning')
+
             else:
                 try:
                     precio = float(precio)
@@ -260,53 +271,82 @@ def editar_producto(id_producto):
                     if precio <= 0 or stock < 0 or len(nombre) > 100:
                         raise ValueError
 
-                    cursor.execute("SELECT id_categoria FROM categorias WHERE id_categoria = %s", 
-                    (id_categoria,))
+                    cursor.execute("""SELECT id_categoria FROM categorias WHERE id_categoria = %s""", (id_categoria,))
 
                     if not cursor.fetchone():
-                        flash('La categoria seleccionada no existe', 'danger')
-                    else:
-                        cursor.execute("""UPDATE productos SET nombre =%s, precio = %s, stock = %s, 
-                    id_categoria = %s WHERE id_producto = %s""", (nombre, precio, stock, id_categoria,
-                    id_producto))
+                        flash('La categoría seleccionada no existe', 'danger')
 
-                    if cursor.rowcount == 0:
-                        flash('No se encontró el producto o no hubo cambios', 'warning')
                     else:
-                        flash('Producto actualizado correctamente', 'sucess')
+                        cursor.execute("""UPDATE productos SET nombre = %s, precio = %s, stock = %s, 
+                            id_categoria = %s WHERE id_producto = %s""", 
+                            (nombre, precio, stock, id_categoria, id_producto))
 
-                    mysql.connection.commit()
-                    cursor.close()
-                    return redirect(url_for('inventario'))
+                        mysql.connection.commit()
+                        flash('Producto actualizado correctamente', 'success')
+                        return redirect(url_for('inventario'))
 
                 except (ValueError, TypeError):
                     flash('Verifica que los datos sean válidos', 'danger')
 
-                    cursor.execute("""SELECT id_producto, nombre, precio, stock, id_categoria FROM productos
-                     WHERE id_producto = %s""", (id_producto,))
+        cursor.execute("""SELECT id_categoria, nombre FROM categorias ORDER BY nombre""")
 
-                    producto = cursor.fetchone()
+        categorias = cursor.fetchall()
 
-                    if not producto:
-                        flash('El producto no existe', 'danger')
-                        cursor.close()
-                        return redirect(url_for('inventario'))
-
-                    cursor.execute("""SELECT id_categoria, nombre FROM categorias ORDER BY nombre""")
-
-                    categorias = cursor.fetchall()
-                    cursor.close()
-
-                    return render_template('editar_producto.html', producto=producto, categorias=categorias)
+        return render_template('editar_producto.html', producto=producto,categorias=categorias)
 
     except Exception as error:
+        mysql.connection.rollback()
+        print('Error al editar producto:', error)
+        flash('No fue posible editar el producto', 'danger')
+        return redirect(url_for('inventario'))
+
+    finally:
         if cursor:
             cursor.close()
-            mysql.connection.rollback()
-            print('Error al editar producto:', error)
-            flash('No fue posible editar el producto', 'danger')
+
+#Eliminar productos del inventario
+@app.route('/eliminar_producto/<int:id_producto>', methods={'POST'})
+def eliminar_producto(id_producto):
+
+    if 'id_usuario' not in session:
+        flash('Inicia sesión para acceder al inventario', 'warning')
+        return redirect(url_for('login'))
+
+    cursor = None
+
+    try:
+        cursor = mysql.connection.cursor()
+
+        cursor.execute("""SELECT id_producto FROM productos WHERE id_producto = %s""", (id_producto,))
+
+        producto = cursor.fetchone()
+
+        if not producto:
+            flash('El producto no existe', 'danger')
             return redirect(url_for('inventario'))
 
+        cursor.execute("""SELECT 1 FROM detalle_venta WHERE id_producto = %s  LIMIT 1"""), (id_producto,)
+
+        if cursor.fetchone():
+            flash('No se puede eliminar: el producto está relacionado con una venta', 'warning')
+            return redirect(url_for('inventario'))
+
+        cursor.execute("""DELETE FROM productos WHERE id_producto = %s"""), (id_producto,)
+
+        mysql.connection.commit()
+        flash('Producto eliminado correctamente', 'success')
+        return redirect(url_for('inventario'))
+
+    except Exception as error:
+        mysql.connection.rollback()
+        print('Error al eliminar producto:', error)
+
+        flash('No fue posible eliminar el producto', 'danger')
+        return redirect(url_for('inventario'))
+
+    finally:
+        if cursor:
+            cursor.close()
 
 # Ejecutar el servidor
 if __name__ == '__main__':
