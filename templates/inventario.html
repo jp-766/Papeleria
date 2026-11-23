@@ -79,10 +79,23 @@
                     <td>{{ producto.categoria }}</td>
                     <td>${{ "%.2f" | format(producto.precio )}}</td>
                     <td>{{ producto.stock }}</td>
+
                     <td>
                         <a href="{{ url_for('editar_producto', id_producto=producto.id_producto) }}"
                             class="btn btn-sm btn-primary">Editar</a>
+
+                        <form method="POST"
+
+                    action="{{ url_for('eliminar_producto', id_producto=producto.id_producto) }}"
+                        style="display: inline;"
+                        onsubmit="return confirm('¿Estás seguro de que deseas eliminar este producto?');">
+
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
                     </td>
+
                 </tr>
                 {% else %}
                 <tr>

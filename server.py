@@ -1,4 +1,6 @@
 import os
+import json
+from decimal import Decimal
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_mysqldb import MySQL
 from flask_wtf.csrf import CSRFProtect
@@ -20,6 +22,18 @@ app.config['MYSQL_CURSORCLASS'] = 'DictCursor'
 csrf = CSRFProtect(app)
 
 mysql = MySQL(app)
+
+# Verificar si el usuario tiene el rol permitido
+def requiere_rol(*roles_permitidos): 
+    if 'id_usuario' not in session:
+        flash('Inicia sesión para continuar', 'warning')
+        return False
+
+    if session.get('id_rol') not in roles_permitidos:
+        flash('No tienes permisos para realizar esta acción', 'danger')
+        return False
+
+    return True
 
 @app.route('/')
 def inicio():
@@ -168,12 +182,34 @@ def catalogo():
         flash('No fue posible cargar el catálogo', 'danger')
         return redirect(url_for('inicio'))
 
+# Punto de venta
+@app.route('/ventas')
+def ventas():
+    if not requiere_rol(1, 2):
+        return redirect(url_for('inicio'))
+
+    try:
+        cursor = mysql.connection.cursor()
+
+        cursor.execute("""SELECT id_producto, nombre, precio, stock FROM productos 
+            WHERE stock > 0 ORDER BY nombre""")
+
+        productos = cursor.fetchall()
+        cursor.close()
+
+        return render_template('ventas.html', productos=productos)
+
+    except Exception as error:
+        print('Error al cargar el punto de venta:', error)
+        flash('No fue posible cargar el punto de venta', 'danger')
+        return redirect(url_for('inicio'))
+        
+
 # Inventario: registrar productos
 @app.route('/inventario', methods=['GET', 'POST'])
 def inventario():
-    if 'id_usuario' not in session:
-        flash('Inicia sesión para acceder al inventario', 'warning')
-        return redirect(url_for('login'))
+    if not requiere_rol(1, 2):
+        return redirect(url_for('inicio'))
 
     try:
         cursor = mysql.connection.cursor()
@@ -234,9 +270,8 @@ def inventario():
 @app.route('/editar_producto/<int:id_producto>', methods=['GET', 'POST'])
 def editar_producto(id_producto):
 
-    if 'id_usuario' not in session:
-        flash('Inicia sesión para acceder al inventario', 'warning')
-        return redirect(url_for('login'))
+    if not requiere_rol(1, 2):
+        return redirect(url_for('inicio'))
 
     cursor = None
 
@@ -308,9 +343,8 @@ def editar_producto(id_producto):
 @app.route('/eliminar_producto/<int:id_producto>', methods={'POST'})
 def eliminar_producto(id_producto):
 
-    if 'id_usuario' not in session:
-        flash('Inicia sesión para acceder al inventario', 'warning')
-        return redirect(url_for('login'))
+    if not requiere_rol(1):
+        return redirect(url_for('inicio'))
 
     cursor = None
 
@@ -325,13 +359,13 @@ def eliminar_producto(id_producto):
             flash('El producto no existe', 'danger')
             return redirect(url_for('inventario'))
 
-        cursor.execute("""SELECT 1 FROM detalle_venta WHERE id_producto = %s  LIMIT 1"""), (id_producto,)
+        cursor.execute("""SELECT 1 FROM detalle_venta WHERE id_producto = %s LIMIT 1""", (id_producto,))     
 
         if cursor.fetchone():
             flash('No se puede eliminar: el producto está relacionado con una venta', 'warning')
             return redirect(url_for('inventario'))
 
-        cursor.execute("""DELETE FROM productos WHERE id_producto = %s"""), (id_producto,)
+        cursor.execute("DELETE FROM productos WHERE id_producto = %s", (id_producto,))
 
         mysql.connection.commit()
         flash('Producto eliminado correctamente', 'success')
@@ -351,4 +385,3 @@ def eliminar_producto(id_producto):
 # Ejecutar el servidor
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-
