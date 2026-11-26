@@ -1,0 +1,90 @@
+{% extends "plantilla.html" %}
+
+{% block titulo %}Detalle de venta - Papelia{% endblock %}
+
+{% block cabecera %}Detalle de venta{% endblock %}
+
+{% block contenido %}
+
+<div class="container mt-4">
+
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"> Venta #{{ venta.id_venta }}</h5>
+
+            <a href="{{ url_for('historial_ventas') }}"
+               class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i>Regresar
+            </a>
+            
+        </div>
+
+        <div class="card-body">
+
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <strong>Fecha:</strong>
+                    <p>{{ venta.fecha }}</p>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Empleado:</strong>
+                    <p>{{ venta.empleado }}</p>
+                </div>
+
+                <div class="col-md-4">
+                    <strong>Número de venta:</strong>
+                    <p>#{{ venta.id_venta }}</p>
+                </div>
+            </div>
+
+            <h5 class="mb-3">Productos vendidos</h5>
+
+            <div class="table-responsive">
+                <table class="table table-hover">
+
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Precio unitario</th>
+                            <th>Cantidad</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for detalle in detalles %}
+                        <tr>
+                            <td>{{ detalle.nombre }}</td>
+
+                            <td>
+                                ${{ "%.2f"|format(detalle.precio_unitario) }}
+                            </td>
+
+                            <td>{{ detalle.cantidad }}</td>
+
+                            <td>
+                                ${{ "%.2f"|format(detalle.subtotal) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+
+                </table>
+            </div>
+
+            <div class="text-end mt-4">
+                <h4>
+                    Total:
+                    <span class="text-success">
+                        ${{ "%.2f"|format(venta.total) }}
+                    </span>
+                </h4>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

@@ -205,6 +205,180 @@ def ventas():
         return redirect(url_for('inicio'))
         
 
+# Registrar una venta
+@app.route('/registrar_venta', methods=['POST'])
+def registrar_venta():
+    if not requiere_rol(1, 2):
+        return redirect(url_for('inicio'))
+
+    cursor = None
+
+    try:
+        datos = json.loads(request.form.get('productos', ''))
+
+        if not isinstance(datos, list) or not datos:
+            flash('El carrito está vacío', 'warning')
+            return redirect(url_for('ventas'))
+
+        ids = set()
+
+        for item in datos:
+            if not isinstance(item, dict):
+                flash('Los datos de la venta no son válidos', 'danger')
+                return redirect(url_for('ventas'))
+
+            id_producto = item.get('id_producto')
+            cantidad = item.get('cantidad')
+
+            if (type(id_producto) is not int or id_producto <= 0
+                or type(cantidad) is not int or cantidad <= 0):
+                flash('Los datos de la venta no son válidos', 'danger')
+                return redirect(url_for('ventas'))
+
+            if id_producto in ids:
+                flash('Hay productos duplicados en la venta', 'danger')
+                return redirect(url_for('ventas'))
+
+            ids.add(id_producto)
+
+        cursor = mysql.connection.cursor()
+        cursor.execute("START TRANSACTION")
+
+        productos_venta = []
+        total = Decimal('0.00')
+
+        for item in datos:
+            cursor.execute("""SELECT id_producto, nombre, precio, stock FROM productos
+                WHERE id_producto = %s FOR UPDATE""", (item['id_producto'],))
+
+            producto = cursor.fetchone()
+
+            if not producto:
+                mysql.connection.rollback()
+                flash('Uno de los productos no existe', 'danger')
+                return redirect(url_for('ventas'))
+
+            cantidad = item['cantidad']
+
+            if producto['stock'] < cantidad:
+                mysql.connection.rollback()
+                flash(f"Stock insuficiente para {producto['nombre']}",'warning')
+                return redirect(url_for('ventas'))
+
+            precio = Decimal(str(producto['precio']))
+            total += precio * cantidad
+
+            productos_venta.append({
+                'id_producto': producto['id_producto'],
+                'cantidad': cantidad,
+                'precio': precio})
+
+        cursor.execute("""INSERT INTO ventas (id_empleado, id_cliente, total)
+            VALUES (%s, NULL, %s)""", (session['id_usuario'], total))
+
+        id_venta = cursor.lastrowid
+
+        for producto in productos_venta:
+            cursor.execute("""INSERT INTO detalle_venta (id_venta, id_producto, cantidad, precio_unitario)
+                VALUES (%s, %s, %s, %s)""",(
+                id_venta,
+                producto['id_producto'],
+                producto['cantidad'],
+                producto['precio']
+            ))
+
+            cursor.execute("""UPDATE productos SET stock = stock - %s WHERE id_producto = %s 
+                AND stock >= %s""", (
+                producto['cantidad'],
+                producto['id_producto'],
+                producto['cantidad']))
+
+            if cursor.rowcount != 1:
+                raise Exception('No fue posible actualizar el inventario')
+
+        mysql.connection.commit()
+
+        flash('Venta registrada correctamente', 'success')
+        return redirect(url_for('ventas'))
+
+    except (ValueError, TypeError, KeyError):
+        mysql.connection.rollback()
+        flash('Los datos de la venta no son válidos', 'danger')
+        return redirect(url_for('ventas'))
+
+    except Exception as error:
+        mysql.connection.rollback()
+        print('Error al registrar la venta:', error)
+        flash('No fue posible registrar la venta', 'danger')
+        return redirect(url_for('ventas'))
+
+    finally:
+        if cursor:
+            cursor.close()
+
+
+# Historial de las ventas
+@app.route('/historial_ventas')
+def historial_ventas():
+    if not requiere_rol(1, 2):
+        return redirect(url_for('inicio'))
+
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute("""SELECT v.id_venta, v.fecha, v.total, u.nombre AS empleado FROM ventas v
+            INNER JOIN usuarios u ON v.id_empleado = u.id_usuario ORDER BY v.fecha DESC""")
+
+        ventas = cursor.fetchall()
+        cursor.close()
+
+        return render_template(
+            'historial_ventas.html',
+            ventas=ventas)
+
+    except Exception as error:
+        print('Error al consultar el historial:', error)
+        flash('No fue posible cargar el historial de ventas', 'danger')
+        return redirect(url_for('ventas'))
+
+
+# Detalle de una venta
+@app.route('/detalle_venta/<int:id_venta>')
+def detalle_venta(id_venta):
+    if not requiere_rol(1, 2):
+        return redirect(url_for('inicio'))
+
+    try:
+        cursor = mysql.connection.cursor()
+        cursor.execute("""SELECT v.id_venta, v.fecha, v.total, u.nombre AS empleado
+            FROM ventas v INNER JOIN usuarios u ON v.id_empleado = u.id_usuario 
+            WHERE v.id_venta = %s""", (id_venta,))
+
+        venta = cursor.fetchone()
+
+        if not venta:
+            cursor.close()
+            flash('La venta no existe', 'warning')
+            return redirect(url_for('historial_ventas'))
+
+        cursor.execute("""SELECT p.nombre, dv.cantidad, dv.precio_unitario, (dv.cantidad * dv.precio_unitario) AS subtotal
+            FROM detalle_venta dv INNER JOIN productos p ON dv.id_producto = p.id_producto
+            WHERE dv.id_venta = %s""", (id_venta,))
+
+        detalles = cursor.fetchall()
+        cursor.close()
+
+        return render_template(
+            'detalle_venta.html',
+            venta=venta,
+            detalles=detalles
+        )
+
+    except Exception as error:
+        print('Error al consultar el detalle de la venta:', error)
+        flash('No fue posible consultar el detalle', 'danger')
+        return redirect(url_for('historial_ventas'))
+
+
 # Inventario: registrar productos
 @app.route('/inventario', methods=['GET', 'POST'])
 def inventario():

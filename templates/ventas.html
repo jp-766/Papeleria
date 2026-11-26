@@ -1,4 +1,3 @@
-
 {% extends "plantilla.html" %}
 
 {% block titulo %}Punto de venta - Papelia{% endblock %}
@@ -152,5 +151,171 @@
 </div>
 
 <script>
+
+let carrito = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+    document.querySelectorAll('.btn-agregar').forEach(function(boton) {
+
+        boton.addEventListener('click', function() {
+
+            const id = parseInt(this.dataset.id);
+            const nombre = this.dataset.nombre;
+            const precio = parseFloat(this.dataset.precio);
+            const stock = parseInt(this.dataset.stock);
+
+            agregarProducto(id, nombre, precio, stock);
+
+        });
+
+    });
+
+});
+
+    function agregarProducto(id, nombre, precio, stock) {
+
+        const campo = document.getElementById('cantidad_' + id);
+        const cantidad = parseInt(campo.value);
+
+        if (isNaN(cantidad) || cantidad < 1) {
+            alert('Ingresa una cantidad válida.');
+            return;}
+
+        const existente = carrito.find(p => p.id === id);
+
+        const cantidadActual = existente
+            ? existente.cantidad
+            : 0;
+
+        if (cantidadActual + cantidad > stock) {
+            alert('No hay suficientes existencias.');
+            return;}
+
+        if (existente) {
+
+            existente.cantidad += cantidad;
+
+        } else {
+
+            carrito.push({
+                id: id,
+                nombre: nombre,
+                precio: precio,
+                cantidad: cantidad,
+                stock: stock
+            });
+        }
+
+        campo.value = 1;
+
+        mostrarCarrito();
+    }
+
+    function eliminarProducto(id) {
+
+        carrito = carrito.filter(p => p.id !== id);
+        mostrarCarrito();
+    }
+
+    function vaciarCarrito() {
+
+        carrito = [];
+        mostrarCarrito();
+    }
+
+    function mostrarCarrito() {
+
+        const tabla = document.getElementById('carrito');
+        const totalTexto = document.getElementById('total');
+
+        tabla.innerHTML = '';
+
+        let total = 0;
+
+        if (carrito.length === 0) {
+
+            tabla.innerHTML = `
+                <tr>
+                    <td colspan="5" class="text-center">
+                        No hay productos agregados.
+                    </td>
+                </tr>
+            `;
+
+        }
+
+        carrito.forEach(producto => {
+
+            const subtotal = producto.precio * producto.cantidad;
+
+            total += subtotal;
+
+            const fila = document.createElement('tr');
+
+            const celdaNombre = document.createElement('td');
+            celdaNombre.textContent = producto.nombre;
+
+            const celdaPrecio = document.createElement('td');
+            celdaPrecio.textContent = '$' + producto.precio.toFixed(2);
+
+            const celdaCantidad = document.createElement('td');
+            celdaCantidad.textContent = producto.cantidad;
+
+            const celdaSubtotal = document.createElement('td');
+            celdaSubtotal.textContent = '$' + subtotal.toFixed(2);
+
+            const celdaAccion = document.createElement('td');
+
+            const boton = document.createElement('button');
+            boton.type = 'button';
+            boton.className = 'btn btn-sm btn-danger';
+            boton.textContent = 'Quitar';
+
+            boton.addEventListener('click', function() {
+                eliminarProducto(producto.id);
+            });
+
+            celdaAccion.appendChild(boton);
+
+            fila.appendChild(celdaNombre);
+            fila.appendChild(celdaPrecio);
+            fila.appendChild(celdaCantidad);
+            fila.appendChild(celdaSubtotal);
+            fila.appendChild(celdaAccion);
+
+            tabla.appendChild(fila);
+
+        });
+
+        totalTexto.textContent = total.toFixed(2);
+    }
+
+function confirmarVenta() {
+
+    if (carrito.length === 0) {
+        alert('Agrega al menos un producto al carrito.');
+        return;
+    }
+
+    const productosVenta = carrito.map(producto => ({
+        id_producto: producto.id,
+        cantidad: producto.cantidad
+    }));
+
+    document.getElementById('productosVenta').value =
+        JSON.stringify(productosVenta);
+
+    document.getElementById('formVenta').submit();
+}
+
+
+</script>
+
+{% endblock %}
+
+
+
+
 
     
